@@ -1,6 +1,6 @@
 import os
 import sqlite3
-import threading
+import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import (
@@ -10,24 +10,11 @@ from aiogram.types import (
     KeyboardButton,
     ReplyKeyboardRemove
 )
-from flask import Flask
-import asyncio
 
 # Загружаем переменные окружения
 TOKEN = os.getenv('TOKEN')
 if not TOKEN:
     raise RuntimeError("TOKEN environment variable not set")
-
-# Создаем Flask приложение для Railway
-# app = Flask(__name__)
-
-# @app.route('/')
-# def home():
-#     return "Хоккейный бот работает!"
-
-# def run_flask():
-#     port = int(os.environ.get('PORT', 5000))
-#     app.run(host='0.0.0.0', port=port)
 
 # Инициализация базы данных
 def init_db():
@@ -433,6 +420,8 @@ async def main():
     dp.message.register(form_teams_start, Command("form_teams"))
     dp.callback_query.register(handle_callback)
     
-    # Запуск бота
+    # ЗАПУСК БОТА (КРИТИЧЕСКИ ВАЖНО!)
+    await dp.start_polling(bot)
+
 if __name__ == "__main__":
     asyncio.run(main())
