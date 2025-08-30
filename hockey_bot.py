@@ -434,11 +434,5 @@ async def main():
     dp.callback_query.register(handle_callback)
     
     # Запуск бота
-    await dp.start_polling(bot)
-
 if __name__ == "__main__":
-    # Запускаем Flask в отдельном потоке
-    threading.Thread(target=run_flask, daemon=True).start()
-    
-    # Запускаем бота
     asyncio.run(main())
