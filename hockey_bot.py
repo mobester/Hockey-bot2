@@ -107,11 +107,11 @@ async def show_events(message: types.Message):
         await message.answer("📭 Нет активных событий")
         return
     
-    text = "🏒 Активные события:\n\n"
+    text = "🏒 <b>Активные события:</b>\n\n"
     for event in events:
-        text += f"• {event[2]} {event[1]} (ID: {event[0]})\n"
+        text += f"• <b>{event[2]}</b> {event[1]} (ID: {event[0]})\n"
     
-    await message.answer(text)
+    await message.answer(text, parse_mode="HTML")
 
 # Показываем события для отметки
 async def show_events_to_mark(message: types.Message):
@@ -144,7 +144,7 @@ async def show_coach_menu(message: types.Message):
         [InlineKeyboardButton(text="👑 Назначить тренера", callback_data="set_coach")]
     ]
     reply_markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
-    await message.answer("👑 Тренерское меню:", reply_markup=reply_markup)
+    await message.answer("👑 <b>Тренерское меню:</b>", reply_markup=reply_markup, parse_mode="HTML")
 
 # Показываем справку
 async def show_help(message: types.Message):
@@ -158,16 +158,6 @@ async def show_help(message: types.Message):
         "Бот автоматически определяет ваши права на основе назначения тренера"
     )
     await message.answer(text, parse_mode="HTML")
-
-# Создание события (через UI)
-async def create_event_start(callback: types.CallbackQuery):
-    await callback.message.edit_text(
-        "📅 Введите дату события (в формате ДД.ММ):",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_coach_menu")]
-        ])
-    )
-    # Здесь можно добавить сохранение состояния для ConversationHandler
 
 # Отметка участия в событии
 async def select_event(callback: types.CallbackQuery):
@@ -213,12 +203,13 @@ async def mark_callback(callback: types.CallbackQuery):
     players = [row[0] for row in c.fetchall()]
     
     # Обновляем сообщение
-    status_text = "✅ Будут:\n" + "\n".join(players) if players else "Пока никто не отметил участие"
+    status_text = "✅ <b>Будут:</b>\n" + "\n".join(players) if players else "Пока никто не отметил участие"
     
     try:
         await callback.message.edit_text(
             f"Подтвердите ваше участие:\n\n{status_text}",
-            reply_markup=callback.message.reply_markup
+            reply_markup=callback.message.reply_markup,
+            parse_mode="HTML"
         )
     except:
         pass  # Если текст не изменился
@@ -309,10 +300,11 @@ async def select_coach(callback: types.CallbackQuery):
     conn.close()
     
     await callback.message.edit_text(
-        f"👑 {user_name} назначен тренером!",
+        f"👑 <b>{user_name}</b> назначен тренером!",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_coach_menu")]
-        ])
+        ]),
+        parse_mode="HTML"
     )
     await callback.answer()
 
@@ -335,6 +327,98 @@ async def handle_main_menu(message: types.Message):
     elif text == "ℹ️ Помощь":
         await show_help(message)
 
+# Создание события (тренер)
+async def create_event(message: types.Message):
+    if not is_coach(message.from_user.id):
+        await message.answer("❌ Только тренер может создавать события")
+        return
+    
+    try:
+        _, date, event_type = message.text.split(maxsplit=2)
+    except:
+        await message.answer(
+            "📌 Используйте формат:\n/create_event ДД.ММ Тип\n"
+            "Пример: /create_event 25.10 Тренировка"
+        )
+        return
+    
+    conn = sqlite3.connect('hockey.db')
+    c = conn.cursor()
+    
+    # Создаем событие
+    c.execute("INSERT INTO events (date, type) VALUES (?, ?)", (date, event_type))
+    event_id = c.lastrowid
+    
+    # Создаем сообщение в чате
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Буду", callback_data=f"mark_{event_id}_1"),
+         InlineKeyboardButton(text="❌ Не буду", callback_data=f"mark_{event_id}_0")]
+    ])
+    
+    msg = await message.answer(
+        f"🏒 <b>{event_type} {date}</b>\n"
+        "Кто будет? Нажмите кнопку ниже:",
+        reply_markup=keyboard,
+        parse_mode="HTML"
+    )
+    
+    # Сохраняем ID сообщения
+    c.execute("UPDATE events SET group_msg_id = ? WHERE event_id = ?", 
+             (msg.message_id, event_id))
+    conn.commit()
+    conn.close()
+
+# Формирование пятёрок (тренер)
+async def form_teams_start(message: types.Message):
+    if not is_coach(message.from_user.id):
+        await message.answer("❌ Только тренер может формировать команды")
+        return
+    
+    conn = sqlite3.connect('hockey.db')
+    c = conn.cursor()
+    c.execute("SELECT event_id, date, type FROM events WHERE status = 'open' ORDER BY event_id DESC LIMIT 1")
+    event = c.fetchone()
+    
+    if not event:
+        await message.answer("❗ Нет активных событий для формирования команд")
+        return
+    
+    # Получаем список участников
+    c.execute('''SELECT u.user_id, u.name FROM participants p
+                 JOIN users u ON p.user_id = u.user_id
+                 WHERE p.event_id = ?''', (event[0],))
+    players = c.fetchall()
+    
+    if len(players) < 5:
+        await message.answer(f"❗ Недостаточно игроков! Есть {len(players)}, нужно минимум 5")
+        return
+    
+    # Распределяем игроков на одну пятёрку (упрощенная версия)
+    import random
+    random.shuffle(players)
+    team = [p[1] for p in players[:5]]
+    
+    # Сохраняем в БД
+    c.execute("INSERT INTO teams (event_id, color, players) VALUES (?, ?, ?)",
+             (event[0], "Красная", ",".join(team)))
+    conn.commit()
+    conn.close()
+    
+    # Отправляем результат
+    result = "🏒 <b>Сформирована пятёрка:</b>\n\n"
+    result += "• <b>Красная:</b>\n" + "\n".join(f"  {i+1}. {p}" for i, p in enumerate(team))
+    
+    await message.answer(result, parse_mode="HTML")
+
+# Создание события через UI
+async def create_event_start(callback: types.CallbackQuery):
+    await callback.message.edit_text(
+        "📅 Введите дату события (в формате ДД.ММ):",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_coach_menu")]
+        ])
+    )
+
 # Основная функция
 async def main():
     init_db()
@@ -345,6 +429,8 @@ async def main():
     # Регистрация обработчиков
     dp.message.register(start_command, Command("start"))
     dp.message.register(handle_main_menu, lambda m: m.text in ["📅 Просмотреть события", "✅ Отметиться на событии", "👑 Тренерское меню", "ℹ️ Помощь"])
+    dp.message.register(create_event, Command("create_event"))
+    dp.message.register(form_teams_start, Command("form_teams"))
     dp.callback_query.register(handle_callback)
     
     # Запуск бота
