@@ -177,3 +177,19 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
+
+from flask import Flask
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Бот работает!"
+
+# Запускаем веб-сервер в отдельном потоке
+import threading
+def run_server():
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
+
+threading.Thread(target=run_server, daemon=True).start()
