@@ -48,6 +48,9 @@ def is_coach(user_id):
 # Показываем главное меню
 async def show_main_menu(message: types.Message):
     user_id = message.from_user.id
+
+      # ДОБАВЬТЕ ЭТУ СТРОКУ ДЛЯ ОТЛАДКИ
+    await message.answer(f"DEBUG: Ваш user_id: {user_id}, is_coach: {is_coach_user}")
     
     # Проверяем, является ли пользователь администратором группы
     is_admin = False
