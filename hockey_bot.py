@@ -36,32 +36,25 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Проверка, является ли пользователь тренером
-def is_coach(user_id):
-    conn = sqlite3.connect('hockey.db')
-    c = conn.cursor()
-    c.execute("SELECT is_coach FROM users WHERE user_id = ?", (user_id,))
-    result = c.fetchone()
-    conn.close()
-    return result[0] == 1 if result else False
-
 # Показываем главное меню
 async def show_main_menu(message: types.Message):
+    # Убедимся, что база данных инициализирована
+    init_db()
+    
     user_id = message.from_user.id
-
-      # ДОБАВЬТЕ ЭТУ СТРОКУ ДЛЯ ОТЛАДКИ
-    await message.answer(f"DEBUG: Ваш user_id: {user_id}, is_coach: {is_coach_user}")
     
-    # Проверяем, является ли пользователь администратором группы
-    is_admin = False
+    # Безопасно проверяем статус тренера
     try:
-        chat_admins = await message.bot.get_chat_administrators(message.chat.id)
-        is_admin = any(admin.user.id == user_id for admin in chat_admins)
-    except:
-        pass
+        is_coach_user = is_coach(user_id)
+    except Exception as e:
+        # Логируем ошибку в консоль (для администратора)
+        print(f"ERROR checking coach status for user {user_id}: {str(e)}")
+        # Для пользователя показываем понятное сообщение
+        await message.answer("⚠️ Ошибка проверки прав. Попробуйте позже.")
+        is_coach_user = False
     
-    # Проверяем, является ли пользователь тренером
-    is_coach_user = is_coach(user_id)
+    # Теперь переменная точно существует
+    await message.answer(f"DEBUG: Ваш user_id: {user_id}, is_coach: {is_coach_user}")
     
     # Создаем клавиатуру
     keyboard = [
@@ -72,10 +65,6 @@ async def show_main_menu(message: types.Message):
     # Кнопки для тренера
     if is_coach_user:
         keyboard.append([KeyboardButton(text="👑 Тренерское меню")])
-    
-    # КНОПКА ДЛЯ АДМИНИСТРАТОРОВ (даже если они не тренеры)
-    elif is_admin:
-        keyboard.append([KeyboardButton(text="👑 Назначить первого тренера")])
     
     # Кнопка помощи
     keyboard.append([KeyboardButton(text="ℹ️ Помощь")])
