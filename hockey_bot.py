@@ -48,6 +48,16 @@ def is_coach(user_id):
 # Показываем главное меню
 async def show_main_menu(message: types.Message):
     user_id = message.from_user.id
+    
+    # Проверяем, является ли пользователь администратором группы
+    is_admin = False
+    try:
+        chat_admins = await message.bot.get_chat_administrators(message.chat.id)
+        is_admin = any(admin.user.id == user_id for admin in chat_admins)
+    except:
+        pass
+    
+    # Проверяем, является ли пользователь тренером
     is_coach_user = is_coach(user_id)
     
     # Создаем клавиатуру
@@ -60,6 +70,10 @@ async def show_main_menu(message: types.Message):
     if is_coach_user:
         keyboard.append([KeyboardButton(text="👑 Тренерское меню")])
     
+    # КНОПКА ДЛЯ АДМИНИСТРАТОРОВ (даже если они не тренеры)
+    elif is_admin:
+        keyboard.append([KeyboardButton(text="👑 Назначить первого тренера")])
+    
     # Кнопка помощи
     keyboard.append([KeyboardButton(text="ℹ️ Помощь")])
     
@@ -70,6 +84,40 @@ async def show_main_menu(message: types.Message):
     )
     
     await message.answer("🏒 Добро пожаловать в бот хоккейной команды!", reply_markup=reply_markup)
+
+# Обработка нажатий на кнопки главного меню
+async def handle_main_menu(message: types.Message):
+    text = message.text
+    
+    if text == "📅 Просмотреть события":
+        await show_events(message)
+    
+    elif text == "✅ Отметиться на событии":
+        await show_events_to_mark(message)
+    
+    elif text == "👑 Тренерское меню":
+        if is_coach(message.from_user.id):
+            await show_coach_menu(message)
+        else:
+            await message.answer("❌ У вас нет прав тренера")
+    
+    # ОБРАБОТКА НОВОЙ КНОПКИ
+    elif text == "👑 Назначить первого тренера":
+        # Проверяем права администратора
+        chat_admins = await message.bot.get_chat_administrators(message.chat.id)
+        if not any(admin.user.id == message.from_user.id for admin in chat_admins):
+            await message.answer("❌ Только администраторы могут назначать тренера")
+            return
+        
+        await message.answer(
+            "❗ Чтобы назначить тренера, ответьте на сообщение игрока командой /set_coach\n\n"
+            "Пример:\n"
+            "1. Ответьте на сообщение игрока\n"
+            "2. Напишите: /set_coach"
+        )
+    
+    elif text == "ℹ️ Помощь":
+        await show_help(message)
 
 # Стартовая команда
 async def start_command(message: types.Message):
