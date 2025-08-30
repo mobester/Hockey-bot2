@@ -19,15 +19,15 @@ if not TOKEN:
     raise RuntimeError("TOKEN environment variable not set")
 
 # Создаем Flask приложение для Railway
-app = Flask(__name__)
+# app = Flask(__name__)
 
-@app.route('/')
-def home():
-    return "Хоккейный бот работает!"
+# @app.route('/')
+# def home():
+#     return "Хоккейный бот работает!"
 
-def run_flask():
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+# def run_flask():
+#     port = int(os.environ.get('PORT', 5000))
+#     app.run(host='0.0.0.0', port=port)
 
 # Инициализация базы данных
 def init_db():
