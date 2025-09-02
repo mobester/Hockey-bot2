@@ -68,8 +68,36 @@ async def check_db_structure(message: types.Message):
         conn.close()
     except Exception as e:
         await message.answer(f"❌ Ошибка при проверке структуры БД: {str(e)}")
+
+# Проверка, является ли пользователь тренером
+def is_coach(user_id):
+    try:
+        conn = sqlite3.connect('hockey.db')
+        c = conn.cursor()
         
-# Показываем главное меню
+        # Проверяем существование таблицы
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        table_exists = c.fetchone()
+        
+        if not table_exists:
+            print(f"ERROR: Table 'users' does not exist")
+            return False
+            
+        # Проверяем существование столбца
+        c.execute("PRAGMA table_info(users)")
+        columns = [col[1] for col in c.fetchall()]
+        if 'is_coach' not in columns:
+            print(f"ERROR: Column 'is_coach' does not exist in users table. Columns: {columns}")
+            return False
+        
+        c.execute("SELECT is_coach FROM users WHERE user_id = ?", (user_id,))
+        result = c.fetchone()
+        conn.close()
+        return result[0] == 1 if result else False
+    except Exception as e:
+        print(f"ERROR in is_coach: {str(e)}")
+        return False
+
 async def show_main_menu(message: types.Message):
     # Убедимся, что база данных инициализирована
     init_db()
@@ -79,21 +107,41 @@ async def show_main_menu(message: types.Message):
     # Безопасно проверяем статус тренера
     try:
         is_coach_user = is_coach(user_id)
+        error_msg = "Нет ошибок"
     except Exception as e:
-        # Логируем ошибку в консоль (для администратора)
+        # Показываем реальную ошибку в логах
         print(f"ERROR checking coach status for user {user_id}: {str(e)}")
-        # Для пользователя показываем понятное сообщение
-        await message.answer("⚠️ Ошибка проверки прав. Попробуйте позже.")
+        error_msg = str(e)
         is_coach_user = False
     
-    # Теперь переменная точно существует
-    await message.answer(f"DEBUG: Ваш user_id: {user_id}, is_coach: {is_coach_user}")
+    # Отправляем подробную отладочную информацию
+    await message.answer(
+        f"🔧 Отладочная информация:\n"
+        f"• user_id: {user_id}\n"
+        f"• is_coach: {is_coach_user}\n"
+        f"• Ошибка: {error_msg}"
+    )
     
     # Создаем клавиатуру
     keyboard = [
         [KeyboardButton(text="📅 Просмотреть события")],
         [KeyboardButton(text="✅ Отметиться на событии")]
     ]
+    
+    # Кнопки для тренера
+    if is_coach_user:
+        keyboard.append([KeyboardButton(text="👑 Тренерское меню")])
+    
+    # Кнопка помощи
+    keyboard.append([KeyboardButton(text="ℹ️ Помощь")])
+    
+    reply_markup = ReplyKeyboardMarkup(
+        keyboard=keyboard,
+        resize_keyboard=True,
+        one_time_keyboard=False
+    )
+    
+    await message.answer("🏒 Добро пожаловать в бот хоккейной команды!", reply_markup=reply_markup)
     
     # Кнопки для тренера
     if is_coach_user:
