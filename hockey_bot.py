@@ -36,6 +36,19 @@ def init_db():
     conn.commit()
     conn.close()
 
+# Проверка базы
+async def check_db_exists(message: types.Message):
+    import os
+    db_path = 'hockey.db'
+    exists = os.path.exists(db_path)
+    await message.answer(f"🔍 Проверка базы данных:\nФайл {db_path} {'существует' if exists else 'НЕ существует'}")
+    
+    if exists:
+        size = os.path.getsize(db_path)
+        await message.answer(f"Размер файла: {size} байт")
+    else:
+        await message.answer("❗ База данных не создана. Попробуйте вызвать /start")
+        
 # Показываем главное меню
 async def show_main_menu(message: types.Message):
     # Убедимся, что база данных инициализирована
@@ -459,6 +472,7 @@ async def main():
     dp.message.register(create_event, Command("create_event"))
     dp.message.register(form_teams_start, Command("form_teams"))
     dp.callback_query.register(handle_callback)
+    dp.message.register(check_db_exists, Command("checkdb"))
     
     # ЗАПУСК БОТА (КРИТИЧЕСКИ ВАЖНО!)
     await dp.start_polling(bot)
