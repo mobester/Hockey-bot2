@@ -36,7 +36,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Проверка базы
+# Проверка базы 1
 async def check_db_exists(message: types.Message):
     import os
     db_path = 'hockey.db'
@@ -48,6 +48,26 @@ async def check_db_exists(message: types.Message):
         await message.answer(f"Размер файла: {size} байт")
     else:
         await message.answer("❗ База данных не создана. Попробуйте вызвать /start")
+# Проверка базы 2
+async def check_db_structure(message: types.Message):
+    try:
+        conn = sqlite3.connect('hockey.db')
+        c = conn.cursor()
+        
+        # Проверяем таблицу users
+        c.execute("PRAGMA table_info(users)")
+        columns = c.fetchall()
+        
+        if not columns:
+            await message.answer("❌ Таблица users не существует!")
+        else:
+            await message.answer("✅ Таблица users существует. Колонки:")
+            for col in columns:
+                await message.answer(f"- {col[1]} ({col[2]})")
+        
+        conn.close()
+    except Exception as e:
+        await message.answer(f"❌ Ошибка при проверке структуры БД: {str(e)}")
         
 # Показываем главное меню
 async def show_main_menu(message: types.Message):
@@ -472,7 +492,9 @@ async def main():
     dp.message.register(create_event, Command("create_event"))
     dp.message.register(form_teams_start, Command("form_teams"))
     dp.callback_query.register(handle_callback)
+    # обработчики проверки бд
     dp.message.register(check_db_exists, Command("checkdb"))
+    dp.message.register(check_db_structure, Command("checkdb")
     
     # ЗАПУСК БОТА (КРИТИЧЕСКИ ВАЖНО!)
     await dp.start_polling(bot)
