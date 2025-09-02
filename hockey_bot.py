@@ -494,7 +494,7 @@ async def main():
     dp.callback_query.register(handle_callback)
     # обработчики проверки бд
     dp.message.register(check_db_exists, Command("checkdb"))
-    dp.message.register(check_db_structure, Command("checkdb")
+    dp.message.register(check_db_structure, Command("checkdb_str"))
     
     # ЗАПУСК БОТА (КРИТИЧЕСКИ ВАЖНО!)
     await dp.start_polling(bot)
